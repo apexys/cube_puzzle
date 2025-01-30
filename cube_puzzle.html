@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Cube Puzzle</title>
+        <script type="importmap">
+            {
+              "imports": {
+                "three": "./three.module.js"
+              }
+            }
+          </script>
+          <script src="oimo.min.js"></script>
+          <script src="cannon.js"></script>
+          <style>
+            body{
+                font-family: monospace;
+            }
+            #info{
+                position: absolute;
+                bottom: 10px;
+                left: 10px;
+            }
+            #controls{
+                position: absolute;
+                top: 10px;
+                right: 10px;
+                display: flex;
+                flex-direction: column;
+            }
+            #stats{
+                position: absolute;
+                top: 10px;
+                left: 10px;
+                display: flex;
+                flex-direction: column;
+            }
+          </style>
+    </head>
+    <body>
+        <pre id="info"></pre>
+        <div id="controls">
+            <button id="reset">Reset</button>
+            <span><input id="cb_debug" type="checkbox" />Debug</span>
+            <span><input id="cb_auto" type="checkbox"/>Auto</span>
+        </div>
+        <div id="stats"></div>
+        <script type="module">
+            import * as THREE from 'three';
+            import { OrbitControls } from './orbit_controls.js';
+
+            const renderer = new THREE.WebGLRenderer();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled=true;
+
+            // Initialize the scene, camera, and renderer
+            const scene = new THREE.Scene();
+            //Set the background color to neutral gray
+            scene.background = new THREE.Color(0xcccccc);
+            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.up = new THREE.Vector3(0, 0, 1);
+            camera.lookAt(new THREE.Vector3(0.0, 0.0, 0.0));
+            camera.position.z = 10;
+            camera.position.y = 10;
+            camera.position.x = 10;
+            const controls = new OrbitControls(camera, renderer.domElement);
+            controls.update();
+
+            //Init Light
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(10,-10,10);
+            directionalLight.lookAt(0,0,0);
+            directionalLight.castShadow = true;
+            //scene.add(directionalLight);
+
+            const spotLight = new THREE.SpotLight(0xffffff, 1.0);
+            spotLight.position.set(5,-5,10);
+            spotLight.lookAt(0,0,0);
+            scene.add(spotLight);
+
+            const ambientLight = new THREE.AmbientLight( 0xffffff, 0.7 );
+            scene.add( ambientLight );
+
+            //renderer.setAnimationLoop(animate);
+            document.body.appendChild(renderer.domElement);
+            // Create a cube geometry and material
+            const geometry = new THREE.BoxGeometry(2.0, 1.2, 1.2).toNonIndexed();
+            const cubeMaterial = new THREE.MeshPhongMaterial({ vertexColors: true, specular: 0xdddddd, shininess: 120 });
+            const positionAttribute = geometry.getAttribute('position');
+            const colors = [];
+            //Each side is 2 triangles of 6 vertices
+            for (let i = 0; i < positionAttribute.count; i+=6){
+                let color;
+                if(i/6 == 4){ //Make top face visible
+                    color = new THREE.Color(0xff9999);
+                }else{
+                    if ((i / 6) % 2 == 0){
+                        color = new THREE.Color(0x111111);
+                    }else{
+                        color = new THREE.Color(0x444444);
+                    }
+                }
+                for(let j = 0; j < 6; j++){
+                    colors.push(color.r, color.g, color.b);
+                }
+            }
+            geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+            // Create the cube mesh
+            const cube = new THREE.Mesh(geometry, cubeMaterial);
+            cube.castShadow=true;
+            scene.add(cube);
+
+            //Add a mesh representing the ground
+            const groundGeometry = new THREE.PlaneGeometry(15, 15);
+            const groundMaterial = new THREE.MeshPhongMaterial({ color: 0xcccccc });
+            //Enable shadows on ground
+            const groundMesh = new THREE.Mesh(groundGeometry, groundMaterial);
+            groundMesh.receiveShadow = true;
+            scene.add(groundMesh);
+
+            //Setup physics
+            let world = new CANNON.World();
+            world.gravity.set(0,0, -9.81);
+            world.broadphase = new CANNON.NaiveBroadphase();
+            world.solver.iterations = 20;
+
+            let ground = new CANNON.Body({mass: 0});
+            ground.addShape(new CANNON.Plane());
+            world.addBody(ground);
+
+            let rand_speed = (speed) => ((Math.random() * 2) - 1) * speed;
+            let rot_speed = 10;
+            let pos_speed = 2;
+            let shape = new CANNON.Box(new CANNON.Vec3(2.0 / 2.0,1.2 / 2.0,1.2 / 2.0));
+            let box = new CANNON.Body({mass: 5, position: new CANNON.Vec3(0,0,10)});
+            box.addShape(shape);
+            //box.rotation.set(0,0,0);
+            box.angularVelocity.set(rand_speed(rot_speed), rand_speed(rot_speed), rand_speed(rot_speed));
+            box.velocity.set(rand_speed(pos_speed), rand_speed(pos_speed), rand_speed(pos_speed));
+            box.linearDaming = 0.1;
+            box.angularDamping = 0.1;
+            world.addBody(box);
+
+            let cb_debug = document.getElementById('cb_debug');
+            let cb_auto = document.getElementById('cb_auto');
+            cb_auto.checked = true;
+
+
+            let resetBox = () => {
+                box.position.set(0,0,10);
+
+                box.quaternion.setFromEuler(Math.random() * Math.PI * 2,Math.random() * Math.PI * 2, Math.random() * Math.PI * 2, "XYZ");
+                box.previousPosition.set(0,0,10);
+                box.angularVelocity.set(rand_speed(rot_speed), rand_speed(rot_speed), rand_speed(rot_speed));
+                box.velocity.set(rand_speed(pos_speed), rand_speed(pos_speed), rand_speed(pos_speed));
+            }
+
+            document.getElementById('reset').onclick =  () => {
+                resetBox();
+                total_throws = 0;
+                total_up = 0;
+                fraction_up = 0;
+            };
+
+            // Render loop
+            let lastTime;
+            let v_avg = 0.0;
+
+            let total_throws = 0;
+            let total_up = 0;
+            let fraction_up = 0;
+
+            function animate(time) {
+                requestAnimationFrame(animate);
+                if(lastTime !== undefined){
+                    let dt = (time - lastTime) / 1000;
+                    world.step(1/60.0, dt, 3);
+                }
+                lastTime = time;
+                
+
+                let v_total = box.velocity.length() + box.angularVelocity.length();
+                v_avg = (v_avg * 0.9) + (v_total * 0.1);
+
+                let face_normal = new THREE.Vector3(0,0,1).normalize();
+                let rotated_normal = face_normal.applyQuaternion(cube.quaternion);
+                let cube_z = rotated_normal.dot(new THREE.Vector3(0,0,1));
+                let fall_done = v_total < 0.01;
+                let cube_up = cube_z > 0.9;
+
+                cube.position.copy(box.position);
+                cube.quaternion.copy(box.quaternion);
+
+                controls.target = cube.position;
+                controls.update();
+                // Update the scene and renderer
+                renderer.render(scene, camera);
+
+                if(cb_debug.checked){
+                    document.getElementById('info').innerText = JSON.stringify({
+                    "position": cube.position,
+                    "rotation": cube.rotation,
+                    "velocity": box.velocity,
+                    "angularVelocity": box.angularVelocity,
+                    "rotated_face_normal": rotated_normal,
+                    "cube_z": cube_z,
+                    "v_total": v_total,
+                    "v_avg": v_avg,
+                    "fall_done": fall_done,
+                    "cube_up": cube_up,
+                }, null, 3);
+                }else{
+                    document.getElementById('info').innerText = "";
+                }
+                
+                document.getElementById('stats').innerText = `${total_up} / ${total_throws} = ${fraction_up}`;
+                
+                if(fall_done && cb_auto.checked){
+                    total_throws += 1;
+                    if(cube_up){
+                        total_up += 1;
+                    }
+                    fraction_up = total_up / total_throws;
+                    resetBox();
+                }
+
+            }
+            animate();
+        </script>
+    </body>
+</html>
