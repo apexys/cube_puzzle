@@ -8,3 +8,5 @@ Assume the white side is one of the larger ones.
 ```
 
 For the moment, LLMs fail horribly at this task, so I built a physics simulation using THREE and Cannon.js
+
+Here's the demo: [https://apexys.github.io/cube_puzzle/cube_puzzle.html](https://apexys.github.io/cube_puzzle/cube_puzzle.html)
