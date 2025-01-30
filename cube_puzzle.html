@@ -33,6 +33,9 @@
                 left: 10px;
                 display: flex;
                 flex-direction: column;
+                font-family: sans-serif;
+                font-weight: bold;
+                font-size: 200%;
             }
           </style>
     </head>
@@ -91,12 +94,12 @@
             for (let i = 0; i < positionAttribute.count; i+=6){
                 let color;
                 if(i/6 == 4){ //Make top face visible
-                    color = new THREE.Color(0xff9999);
+                    color = new THREE.Color(0xffffff);
                 }else{
                     if ((i / 6) % 2 == 0){
-                        color = new THREE.Color(0x111111);
+                        color = new THREE.Color(0x112211);
                     }else{
-                        color = new THREE.Color(0x444444);
+                        color = new THREE.Color(0x111122);
                     }
                 }
                 for(let j = 0; j < 6; j++){
@@ -212,7 +215,7 @@
                     document.getElementById('info').innerText = "";
                 }
                 
-                document.getElementById('stats').innerText = `${total_up} / ${total_throws} = ${fraction_up}`;
+                document.getElementById('stats').innerText = `White: ${total_up} / ${total_throws} = ${Math.round(fraction_up * 100000)  / 1000}%`;
                 
                 if(fall_done && cb_auto.checked){
                     total_throws += 1;
